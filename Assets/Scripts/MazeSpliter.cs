@@ -1,27 +1,40 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using NaughtyAttributes;
 using UnityEngine;
 
-public class MazeGenerator : MonoBehaviour
+using Random = UnityEngine.Random;
+
+public class MazeSpliter : MonoBehaviour
 {
-    [SerializeField] private int mazeMaxX = 100;
-    [SerializeField] private int mazeMaxY = 100;
-    [SerializeField, Min(0)] private int minRoomLength = 5;
-    // has to be an even number
+    [HideInInspector] public static MazeSpliter instance;
+
+    [Header("Maze dimensions")]
+    [SerializeField] private int maxMazeX = 100;
+    [SerializeField] private int maxMazeY = 100;
+    [Min(0)] public int minRoomLength = 5;
     [SerializeField, Min(0)] private int wallThickness = 2;
+
+    [Header("Room generation")]
+    [SerializeField] private bool generateInstantly = false;
     [SerializeField, Min(0)] private float splitDelay = 0.2f;
 
     [SerializeField] private List<Room> rooms;
-    [SerializeField] private List<Room> completedRooms;
-    private bool generatingRooms = false;
-    private bool addedWalls = false;
+    [ReadOnly] public List<Room> completedRooms;
 
+    [Header("State variables")]
+    private bool splitingRooms = false;
+    private bool addedWalls = false;
+    [HideInInspector] public static bool finishedSpliting = false;
+
+    void Awake()
+    {
+        instance = this;
+    }
     void Start()
     {
-        rooms.Add(new Room(0, 0, mazeMaxX, mazeMaxY));
+        rooms.Add(new Room(0, 0, maxMazeX, maxMazeY));
     }
 
     void Update()
@@ -38,18 +51,22 @@ public class MazeGenerator : MonoBehaviour
         }
     }
 
+    #region Controling generation
+    /// <summary>
+    /// Will reset the rooms and start spliting until all rooms cannot be split
+    /// </summary>
     [Button(enabledMode: EButtonEnableMode.Playmode)]
-    public IEnumerator StartGeneration()
+    private IEnumerator StartSpliting()
     {
-        if (generatingRooms)
+        if (splitingRooms)
             yield break;
 
         Reset();
-        generatingRooms = true;
+        splitingRooms = true;
 
         while (rooms.Count > 0)
         {
-            if (UnityEngine.Random.Range(0, 1) == 1)
+            if (Random.Range(0, 1) == 1)
             {
                 SplitHorizontal();
             }
@@ -57,30 +74,45 @@ public class MazeGenerator : MonoBehaviour
             {
                 SplitVertical();
             }
-            yield return new WaitForSeconds(splitDelay);
+            if (!generateInstantly)
+                yield return new WaitForSeconds(splitDelay);
         }
+        completedRooms.Sort(CompareRoomsY);
         AddWalls();
-        generatingRooms = false;
+        splitingRooms = false;
     }
 
+    /// <summary>
+    /// Will stop the StartGeneration corutine
+    /// </summary>
     [Button(enabledMode: EButtonEnableMode.Playmode)]
-    public void StopGeneration()
+    private void StopSpliting()
     {
-        StopAllCoroutines();
+        StopCoroutine(StartSpliting());
+        splitingRooms = false;
     }
 
+    /// <summary>
+    /// Will erase any existing rooms and create a room based on both maxMazeX/Y
+    /// </summary>
     [Button(enabledMode: EButtonEnableMode.Playmode)]
-    public void Reset()
+    private void Reset()
     {
         addedWalls = false;
+        finishedSpliting = false;
 
         rooms.Clear();
         completedRooms.Clear();
-        rooms.Add(new Room(0, 0, mazeMaxX, mazeMaxY));
+        rooms.Add(new Room(0, 0, maxMazeX, maxMazeY));
     }
+    #endregion
 
+    #region Spliting functions
+    /// <summary>
+    /// Will try to split the room horizontaly if its not possible, it will try to do so verticaly
+    /// </summary>
     [Button(enabledMode: EButtonEnableMode.Playmode)]
-    public void SplitHorizontal()
+    private void SplitHorizontal()
     {
         if (rooms.Count <= 0)
         {
@@ -89,8 +121,8 @@ public class MazeGenerator : MonoBehaviour
         }
 
         List<Room> tempRooms = new List<Room>();
-        int splitingRoom = UnityEngine.Random.Range(0, rooms.Count);
-        int randomSplitDistance = UnityEngine.Random.Range(minRoomLength, rooms[splitingRoom].width - minRoomLength);
+        int splitingRoom = Random.Range(0, rooms.Count);
+        int randomSplitDistance = Random.Range(minRoomLength, rooms[splitingRoom].width - minRoomLength);
 
         if (rooms[splitingRoom].widthLimit)
         {
@@ -120,8 +152,11 @@ public class MazeGenerator : MonoBehaviour
         CheckSplitLimits(rooms);
     }
 
+    /// <summary>
+    /// Will try to split the room verticaly if its not possible, it will try to do so horizontaly
+    /// </summary>
     [Button(enabledMode: EButtonEnableMode.Playmode)]
-    public void SplitVertical()
+    private void SplitVertical()
     {
         if (rooms.Count <= 0)
         {
@@ -130,8 +165,8 @@ public class MazeGenerator : MonoBehaviour
         }
 
         List<Room> tempRooms = new List<Room>();
-        int splitingRoom = UnityEngine.Random.Range(0, rooms.Count);
-        int randomSplitDistance = UnityEngine.Random.Range(minRoomLength, rooms[splitingRoom].height - minRoomLength);
+        int splitingRoom = Random.Range(0, rooms.Count);
+        int randomSplitDistance = Random.Range(minRoomLength, rooms[splitingRoom].height - minRoomLength);
 
         if (rooms[splitingRoom].heightLimit)
         {
@@ -160,9 +195,14 @@ public class MazeGenerator : MonoBehaviour
 
         CheckSplitLimits(rooms);
     }
+    #endregion
 
+    #region AddWalls function
+    /// <summary>
+    /// Can only be executed after all rooms cannot be split anymore, will move all rooms southwest by (wallThickness / 2), and increase the size by (wallThickness)
+    /// </summary>
     [Button(enabledMode: EButtonEnableMode.Playmode)]
-    public void AddWalls()
+    private void AddWalls()
     {
         if (rooms.Count > 0)
         {
@@ -175,13 +215,6 @@ public class MazeGenerator : MonoBehaviour
             return;
         }
 
-        foreach (Room room in rooms)
-        {
-            room.posX -= wallThickness / 2;
-            room.posY -= wallThickness / 2;
-            room.width += wallThickness;
-            room.height += wallThickness;
-        }
         foreach (Room room in completedRooms)
         {
             room.posX -= wallThickness / 2;
@@ -191,8 +224,14 @@ public class MazeGenerator : MonoBehaviour
         }
         addedWalls = true;
     }
+    #endregion
 
-    public void CheckSplitLimits(List<Room> input)
+    #region Additional functions
+    /// <summary>
+    /// Will check whether all input rooms can be split verticaly or horizontaly, if not, move the room to completedRooms
+    /// </summary>
+    /// <param name="Rooms to check"></param>
+    private void CheckSplitLimits(List<Room> input)
     {
         List<Room> roomsToRemove = new List<Room>();
 
@@ -218,8 +257,78 @@ public class MazeGenerator : MonoBehaviour
         {
             rooms.Remove(room);
         }
+
+        if (rooms.Count == 0)
+        {
+            finishedSpliting = true;
+            Debug.Log("Finished Spliting");
+        }
     }
 
+    /// <summary>
+    /// Compares room1 and room2 first on their Y position and if its the same then in their X position.
+    /// Returns -1 if room1 is closer to the origin, 1 if room1 is farther away from the origin1 and 0 if their position is the same
+    /// </summary>
+    public int CompareRoomsY(Room room1, Room room2)
+    {
+        if (room1.posY == room2.posY)
+        {
+            if (room1.posX == room2.posX)
+            {
+                return 0;
+            }
+            else if (room1.posX < room2.posX)
+            {
+                return -1;
+            }
+            else
+            {
+                return 1;
+            }
+        }
+        else if (room1.posY < room2.posY)
+        {
+            return -1;
+        }
+        else
+        {
+            return 1;
+        }
+    }
+
+    /// <summary>
+    /// Compares room1 and room2 first on their X position and if its the same then in their Y position.
+    /// Returns -1 if room1 is closer to the origin, 1 if room1 is farther away from the origin1 and 0 if their position is the same
+    /// </summary>
+    public int CompareRoomsX(Room room1, Room room2)
+    {
+        if (room1.posX == room2.posX)
+        {
+            if (room1.posY == room2.posY)
+            {
+                return 0;
+            }
+            else if (room1.posY < room2.posY)
+            {
+                return -1;
+            }
+            else
+            {
+                return 1;
+            }
+        }
+        else if (room1.posX < room2.posX)
+        {
+            return -1;
+        }
+        else
+        {
+            return 1;
+        }
+    }
+    #endregion
+
+    #region Room class
     [Serializable]
     public class Room
     {
@@ -239,4 +348,5 @@ public class MazeGenerator : MonoBehaviour
             this.height = height;
         }
     }
+    #endregion
 }
