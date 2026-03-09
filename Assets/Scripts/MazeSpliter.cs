@@ -11,22 +11,22 @@ public class MazeSpliter : MonoBehaviour
     [HideInInspector] public static MazeSpliter instance;
 
     [Header("Maze dimensions")]
-    [SerializeField] private int maxMazeX = 100;
-    [SerializeField] private int maxMazeY = 100;
+    public int maxMazeX = 100;
+    public int maxMazeY = 100;
     [Min(0)] public int minRoomLength = 5;
-    [SerializeField, Min(0)] private int wallThickness = 2;
+    [Min(0)] public int wallThickness = 2;
 
     [Header("Room generation")]
     [SerializeField] private bool generateInstantly = false;
     [SerializeField, Min(0)] private float splitDelay = 0.2f;
 
-    [SerializeField] private List<Room> rooms;
-    [ReadOnly] public List<Room> completedRooms;
+    private List<Room> rooms = new();
+    [HideInInspector] public List<Room> completedRooms = new();
 
     [Header("State variables")]
     private bool splitingRooms = false;
     private bool addedWalls = false;
-    [HideInInspector] public static bool finishedSpliting = false;
+    [HideInInspector] public bool finishedSpliting = false;
 
     void Awake()
     {
@@ -41,14 +41,13 @@ public class MazeSpliter : MonoBehaviour
     {
         foreach (Room room in completedRooms)
         {
-            if (!room.hide)
-                AlgorithmsUtils.DebugRectInt(new RectInt(new Vector2Int(room.posX, room.posY), new Vector2Int(room.width, room.height)), Color.blue);
+            AlgorithmsUtils.DebugRectInt(room.rectInt, Color.blue);
         }
-        foreach (Room room in rooms)
-        {
-            if (!room.hide)
-                AlgorithmsUtils.DebugRectInt(new RectInt(new Vector2Int(room.posX, room.posY), new Vector2Int(room.width, room.height)), Color.yellow);
-        }
+        if (!generateInstantly)
+            foreach (Room room in rooms)
+            {
+                AlgorithmsUtils.DebugRectInt(room.rectInt, Color.yellow);
+            }
     }
 
     #region Controling generation
@@ -77,9 +76,14 @@ public class MazeSpliter : MonoBehaviour
             if (!generateInstantly)
                 yield return new WaitForSeconds(splitDelay);
         }
-        completedRooms.Sort(CompareRoomsY);
+        // completedRooms.Sort(CompareRoomsY);
         AddWalls();
         splitingRooms = false;
+
+        Debug.Log("Finished Spliting");
+
+        if (DoorGenerator.instance.autoGenerate)
+            StartCoroutine(DoorGenerator.instance.GenerateDoors());
     }
 
     /// <summary>
@@ -88,7 +92,7 @@ public class MazeSpliter : MonoBehaviour
     [Button(enabledMode: EButtonEnableMode.Playmode)]
     private void StopSpliting()
     {
-        StopCoroutine(StartSpliting());
+        StopAllCoroutines();
         splitingRooms = false;
     }
 
@@ -100,6 +104,8 @@ public class MazeSpliter : MonoBehaviour
     {
         addedWalls = false;
         finishedSpliting = false;
+        CameraUpdater.instance.UpdateCameraLocation();
+        DoorGenerator.instance.Reset();
 
         rooms.Clear();
         completedRooms.Clear();
@@ -122,7 +128,7 @@ public class MazeSpliter : MonoBehaviour
 
         List<Room> tempRooms = new List<Room>();
         int splitingRoom = Random.Range(0, rooms.Count);
-        int randomSplitDistance = Random.Range(minRoomLength, rooms[splitingRoom].width - minRoomLength);
+        int randomSplitDistance = Random.Range(minRoomLength, rooms[splitingRoom].rectInt.width - minRoomLength);
 
         if (rooms[splitingRoom].widthLimit)
         {
@@ -131,17 +137,17 @@ public class MazeSpliter : MonoBehaviour
         }
 
         tempRooms.Add(new Room(
-            rooms[splitingRoom].posX,
-            rooms[splitingRoom].posY,
+            rooms[splitingRoom].rectInt.x,
+            rooms[splitingRoom].rectInt.y,
             randomSplitDistance,
-            rooms[splitingRoom].height
+            rooms[splitingRoom].rectInt.height
             ));
 
         tempRooms.Add(new Room(
-            rooms[splitingRoom].posX + randomSplitDistance,
-            rooms[splitingRoom].posY,
-            rooms[splitingRoom].width - randomSplitDistance,
-            rooms[splitingRoom].height
+            rooms[splitingRoom].rectInt.x + randomSplitDistance,
+            rooms[splitingRoom].rectInt.y,
+            rooms[splitingRoom].rectInt.width - randomSplitDistance,
+            rooms[splitingRoom].rectInt.height
             ));
 
         rooms.RemoveAt(splitingRoom);
@@ -166,7 +172,7 @@ public class MazeSpliter : MonoBehaviour
 
         List<Room> tempRooms = new List<Room>();
         int splitingRoom = Random.Range(0, rooms.Count);
-        int randomSplitDistance = Random.Range(minRoomLength, rooms[splitingRoom].height - minRoomLength);
+        int randomSplitDistance = Random.Range(minRoomLength, rooms[splitingRoom].rectInt.height - minRoomLength);
 
         if (rooms[splitingRoom].heightLimit)
         {
@@ -175,17 +181,17 @@ public class MazeSpliter : MonoBehaviour
         }
 
         tempRooms.Add(new Room(
-            rooms[splitingRoom].posX,
-            rooms[splitingRoom].posY,
-            rooms[splitingRoom].width,
+            rooms[splitingRoom].rectInt.x,
+            rooms[splitingRoom].rectInt.y,
+            rooms[splitingRoom].rectInt.width,
             randomSplitDistance
             ));
 
         tempRooms.Add(new Room(
-            rooms[splitingRoom].posX,
-            rooms[splitingRoom].posY + randomSplitDistance,
-            rooms[splitingRoom].width,
-            rooms[splitingRoom].height - randomSplitDistance
+            rooms[splitingRoom].rectInt.x,
+            rooms[splitingRoom].rectInt.y + randomSplitDistance,
+            rooms[splitingRoom].rectInt.width,
+            rooms[splitingRoom].rectInt.height - randomSplitDistance
             ));
 
         rooms.RemoveAt(splitingRoom);
@@ -217,10 +223,10 @@ public class MazeSpliter : MonoBehaviour
 
         foreach (Room room in completedRooms)
         {
-            room.posX -= wallThickness / 2;
-            room.posY -= wallThickness / 2;
-            room.width += wallThickness;
-            room.height += wallThickness;
+            room.rectInt.x -= wallThickness / 2;
+            room.rectInt.y -= wallThickness / 2;
+            room.rectInt.width += wallThickness;
+            room.rectInt.height += wallThickness;
         }
         addedWalls = true;
     }
@@ -237,12 +243,12 @@ public class MazeSpliter : MonoBehaviour
 
         foreach (Room room in input)
         {
-            if (room.width <= minRoomLength * 2)
+            if (room.rectInt.width <= minRoomLength * 2)
             {
                 room.widthLimit = true;
             }
 
-            if (room.height <= minRoomLength * 2)
+            if (room.rectInt.height <= minRoomLength * 2)
             {
                 room.heightLimit = true;
             }
@@ -261,92 +267,70 @@ public class MazeSpliter : MonoBehaviour
         if (rooms.Count == 0)
         {
             finishedSpliting = true;
-            Debug.Log("Finished Spliting");
         }
     }
 
-    /// <summary>
-    /// Compares room1 and room2 first on their Y position and if its the same then in their X position.
-    /// Returns -1 if room1 is closer to the origin, 1 if room1 is farther away from the origin1 and 0 if their position is the same
-    /// </summary>
-    public int CompareRoomsY(Room room1, Room room2)
-    {
-        if (room1.posY == room2.posY)
-        {
-            if (room1.posX == room2.posX)
-            {
-                return 0;
-            }
-            else if (room1.posX < room2.posX)
-            {
-                return -1;
-            }
-            else
-            {
-                return 1;
-            }
-        }
-        else if (room1.posY < room2.posY)
-        {
-            return -1;
-        }
-        else
-        {
-            return 1;
-        }
-    }
+    // <summary>
+    // Compares room1 and room2 first on their Y position and if its the same then in their X position.
+    // Returns -1 if room1 is closer to the origin, 1 if room1 is farther away from the origin1 and 0 if their position is the same
+    // </summary>
+    // public int CompareRoomsY(Room room1, Room room2)
+    // {
+    //     if (room1.posY == room2.posY)
+    //     {
+    //         if (room1.posX == room2.posX)
+    //         {
+    //             return 0;
+    //         }
+    //         else if (room1.posX < room2.posX)
+    //         {
+    //             return -1;
+    //         }
+    //         else
+    //         {
+    //             return 1;
+    //         }
+    //     }
+    //     else if (room1.posY < room2.posY)
+    //     {
+    //         return -1;
+    //     }
+    //     else
+    //     {
+    //         return 1;
+    //     }
+    // }
 
-    /// <summary>
-    /// Compares room1 and room2 first on their X position and if its the same then in their Y position.
-    /// Returns -1 if room1 is closer to the origin, 1 if room1 is farther away from the origin1 and 0 if their position is the same
-    /// </summary>
-    public int CompareRoomsX(Room room1, Room room2)
-    {
-        if (room1.posX == room2.posX)
-        {
-            if (room1.posY == room2.posY)
-            {
-                return 0;
-            }
-            else if (room1.posY < room2.posY)
-            {
-                return -1;
-            }
-            else
-            {
-                return 1;
-            }
-        }
-        else if (room1.posX < room2.posX)
-        {
-            return -1;
-        }
-        else
-        {
-            return 1;
-        }
-    }
-    #endregion
+    // <summary>
+    // Compares room1 and room2 first on their X position and if its the same then in their Y position.
+    // Returns -1 if room1 is closer to the origin, 1 if room1 is farther away from the origin1 and 0 if their position is the same
+    // </summary>
+    // public int CompareRoomsX(Room room1, Room room2)
+    // {
+    //     if (room1.rectInt.x == room2.rectInt.x)
+    //     {
+    //         if (room1.rectInt.y == room2.rectInt.y)
+    //         {
+    //             return 0;
+    //         }
+    //         else if (room1.rectInt.y < room2.rectInt.y)
+    //         {
+    //             return -1;
+    //         }
+    //         else
+    //         {
+    //             return 1;
+    //         }
+    //     }
+    //     else if (room1.rectInt.x < room2.rectInt.x)
+    //     {
+    //         return -1;
+    //     }
+    //     else
+    //     {
+    //         return 1;
+    //     }
+    // }
 
-    #region Room class
-    [Serializable]
-    public class Room
-    {
-        public bool hide;
-        public int posX;
-        public int posY;
-        public int width;
-        public int height;
-        public bool widthLimit = false;
-        public bool heightLimit = false;
-
-        public Room(int posX, int posY, int width, int height)
-        {
-            this.posX = posX;
-            this.posY = posY;
-            this.width = width;
-            this.height = height;
-        }
-    }
     #endregion
 }

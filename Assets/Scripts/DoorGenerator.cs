@@ -1,105 +1,117 @@
 using System.Collections;
 using System.Collections.Generic;
 using NaughtyAttributes;
-using NUnit.Framework;
 using UnityEngine;
 
 public class DoorGenerator : MonoBehaviour
 {
+    public static DoorGenerator instance;
     private MazeSpliter mazeSpliter;
-    [ReadOnly, SerializeField] private MazeSpliter.Room[] rooms;
-    private int currentRoomIndex = 0;
+    [SerializeField] private int doorSize = 2;
+    private Room[] rooms;
+    private List<RectInt> doors = new();
+    public bool autoGenerate = true;
+    [SerializeField] private bool generateInstantly = false;
+    [SerializeField, Min(0)] private float doorDelay = 0.01f;
+
+    void Awake()
+    {
+        instance = this;
+    }
 
     private void Start()
     {
         mazeSpliter = MazeSpliter.instance;
-
-        StartCoroutine(GenerateDoors());
     }
 
-    private IEnumerator GenerateDoors()
+    void Update()
     {
-        yield return new WaitUntil(() => MazeSpliter.finishedSpliting == true);
-
-
-    }
-
-    private List<MazeSpliter.Room> FindAdjacentRooms(MazeSpliter.Room room)
-    {
-        List<MazeSpliter.Room> adjacentRooms = new List<MazeSpliter.Room>();
-        List<MazeSpliter.Room> posibleAdjacentRooms = new List<MazeSpliter.Room>();
-
-        int minY = room.posY - 2 * mazeSpliter.minRoomLength;
-        int minX = room.posX - 2 * mazeSpliter.minRoomLength;
-        int maxY = room.posY + room.height;
-        int maxX = room.posX + room.width;
-
-        for (int index = FindRoomIndex(rooms, minY, true, false); index <= FindRoomIndex(rooms, maxY, true, true); index++)
+        foreach (RectInt door in doors)
         {
-            if (rooms[index].posX >= minX || rooms[index].posX < maxX)
-            {
-                posibleAdjacentRooms.Add(rooms[index]);
-            }
+            AlgorithmsUtils.DebugRectInt(door, Color.cyan);
         }
-        posibleAdjacentRooms.Remove(room);
+    }
 
-        foreach (MazeSpliter.Room posibleAdjacent in posibleAdjacentRooms)
+    [Button(enabledMode: EButtonEnableMode.Playmode)]
+    public IEnumerator GenerateDoors()
+    {
+        Reset();
+
+        GetRooms();
+
+        for (int roomIndex = 0; roomIndex < rooms.Length; roomIndex++)
         {
-            if (AlgorithmsUtils.Intersects(new RectInt(new Vector2Int(posibleAdjacent.posX, posibleAdjacent.posY), new Vector2Int(posibleAdjacent.width, posibleAdjacent.height)), new RectInt(new Vector2Int(room.posX, room.posY), new Vector2Int(room.width, room.height))))
+            for (int compararisonIndex = roomIndex + 1; compararisonIndex < rooms.Length; compararisonIndex++)
             {
-                adjacentRooms.Add(posibleAdjacent);
+                if (AlgorithmsUtils.Intersects(rooms[roomIndex].rectInt, rooms[compararisonIndex].rectInt))
+                {
+                    rooms[roomIndex].ConnectRooms(rooms[compararisonIndex]);
+
+                    if (SpaceForDoor(rooms[roomIndex], rooms[compararisonIndex]))
+                    {
+                        GenerateDoor(rooms[roomIndex], rooms[compararisonIndex]);
+                    }
+
+                    if (!generateInstantly)
+                        yield return new WaitForSeconds(doorDelay);
+                }
             }
         }
 
-        return adjacentRooms;
+        Debug.Log("Finished Generating Doors");
     }
 
-    private void GenerateDoor()
+    [Button(enabledMode: EButtonEnableMode.Playmode)]
+    public void Reset()
     {
-
+        doors = new();
     }
 
-    private int FindRoomIndex(MazeSpliter.Room[] list, int targetInt, bool searchY, bool lowerFallback)
+    private bool SpaceForDoor(Room room1, Room room2)
     {
-        int lowClamp = 0;
-        int highClamp = list.Length;
-        int mid;
+        RectInt intersect = AlgorithmsUtils.Intersect(room1.rectInt, room2.rectInt);
 
-        while (true)
+        if (((intersect.width > intersect.height ? intersect.width : intersect.height) - 2 * mazeSpliter.wallThickness) < (doorSize + 2 * mazeSpliter.wallThickness))
         {
-            mid = (int)Mathf.Floor((lowClamp + highClamp) / 2f);
+            return false;
+        }
+        else
+        {
+            return true;
+        }
+    }
 
-            if ((searchY ? list[mid].posY : list[mid].posX) == targetInt)
-            {
-                return mid;
-            }
-            else if ((searchY ? list[mid].posY : list[mid].posX) < targetInt)
-            {
-                if (highClamp == mid)
-                {
-                    return mid;
-                }
-                highClamp = mid;
-            }
-            else
-            {
-                if (lowClamp == mid)
-                {
-                    return mid + (lowerFallback ? 0 : 1);
-                }
-                lowClamp = mid;
-            }
+    private void GenerateDoor(Room room1, Room room2)
+    {
+        RectInt intersect = AlgorithmsUtils.Intersect(room1.rectInt, room2.rectInt);
+
+        if (intersect.width > intersect.height)
+        {
+            doors.Add(new RectInt(
+                intersect.x + Random.Range(mazeSpliter.wallThickness, intersect.width - doorSize),
+                intersect.y,
+                doorSize,
+                intersect.height));
+        }
+        else
+        {
+            doors.Add(new RectInt(
+                intersect.x,
+                intersect.y + Random.Range(mazeSpliter.wallThickness, intersect.height - doorSize),
+                intersect.width,
+                doorSize));
         }
     }
 
     private void GetRooms()
     {
-        rooms = new MazeSpliter.Room[mazeSpliter.completedRooms.Count];
+        rooms = new Room[mazeSpliter.completedRooms.Count];
         int index = 0;
 
-        foreach (MazeSpliter.Room room in mazeSpliter.completedRooms)
+        foreach (Room room in mazeSpliter.completedRooms)
         {
             rooms[index] = room;
+            index++;
         }
     }
 }
