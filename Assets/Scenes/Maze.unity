@@ -207,7 +207,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 250, y: 1, z: 250}
+  m_LocalPosition: {x: 250, y: 5, z: 250}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -401,6 +401,7 @@ GameObject:
   - component: {fileID: 521360283}
   - component: {fileID: 521360282}
   - component: {fileID: 521360284}
+  - component: {fileID: 521360285}
   m_Layer: 0
   m_Name: Maze
   m_TagString: Untagged
@@ -420,11 +421,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f209a7f614c654e979759975ca680b0e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  randomizeSeed: 1
+  seed: 0
   maxMazeX: 100
   maxMazeY: 100
   minRoomLength: 8
   wallThickness: 1
-  generateInstantly: 0
+  generateInstantly: 1
   splitDelay: 0.01
   finishedSpliting: 0
 --- !u!4 &521360283
@@ -456,8 +459,24 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   doorSize: 2
   autoGenerate: 1
-  generateInstantly: 0
+  generateInstantly: 1
   doorDelay: 0.01
+--- !u!114 &521360285
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 521360281}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5cfd601bcd8134259ba188b0eb91b381, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  searchType: 0
+  autoGenerate: 1
+  generateInstantly: 1
+  NavigationDelay: 0.01
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

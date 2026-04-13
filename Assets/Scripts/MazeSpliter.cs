@@ -1,4 +1,3 @@
-using System;
 using System.Collections;
 using System.Collections.Generic;
 using NaughtyAttributes;
@@ -9,6 +8,10 @@ using Random = UnityEngine.Random;
 public class MazeSpliter : MonoBehaviour
 {
     [HideInInspector] public static MazeSpliter instance;
+
+    [Header("Random")]
+    public bool randomizeSeed = true;
+    public int seed = 0;
 
     [Header("Maze dimensions")]
     public int maxMazeX = 100;
@@ -87,29 +90,31 @@ public class MazeSpliter : MonoBehaviour
     }
 
     /// <summary>
-    /// Will stop the StartGeneration corutine
-    /// </summary>
-    [Button(enabledMode: EButtonEnableMode.Playmode)]
-    private void StopSpliting()
-    {
-        StopAllCoroutines();
-        splitingRooms = false;
-    }
-
-    /// <summary>
     /// Will erase any existing rooms and create a room based on both maxMazeX/Y
     /// </summary>
     [Button(enabledMode: EButtonEnableMode.Playmode)]
     private void Reset()
     {
+        if (!MazeSpliter.instance.randomizeSeed)
+            Random.InitState(MazeSpliter.instance.seed);
+
         addedWalls = false;
         finishedSpliting = false;
         CameraUpdater.instance.UpdateCameraLocation();
         DoorGenerator.instance.Reset();
+        NavigationGraph.instance.Reset();
 
         rooms.Clear();
         completedRooms.Clear();
         rooms.Add(new Room(0, 0, maxMazeX, maxMazeY));
+    }
+
+    [Button(enabledMode: EButtonEnableMode.Playmode)]
+    private void StopAllGeneration()
+    {
+        StopAllCoroutines();
+        splitingRooms = false;
+
     }
     #endregion
 
@@ -117,7 +122,6 @@ public class MazeSpliter : MonoBehaviour
     /// <summary>
     /// Will try to split the room horizontaly if its not possible, it will try to do so verticaly
     /// </summary>
-    [Button(enabledMode: EButtonEnableMode.Playmode)]
     private void SplitHorizontal()
     {
         if (rooms.Count <= 0)
@@ -161,7 +165,6 @@ public class MazeSpliter : MonoBehaviour
     /// <summary>
     /// Will try to split the room verticaly if its not possible, it will try to do so horizontaly
     /// </summary>
-    [Button(enabledMode: EButtonEnableMode.Playmode)]
     private void SplitVertical()
     {
         if (rooms.Count <= 0)
@@ -207,7 +210,6 @@ public class MazeSpliter : MonoBehaviour
     /// <summary>
     /// Can only be executed after all rooms cannot be split anymore, will move all rooms southwest by (wallThickness / 2), and increase the size by (wallThickness)
     /// </summary>
-    [Button(enabledMode: EButtonEnableMode.Playmode)]
     private void AddWalls()
     {
         if (rooms.Count > 0)
@@ -236,7 +238,6 @@ public class MazeSpliter : MonoBehaviour
     /// <summary>
     /// Will check whether all input rooms can be split verticaly or horizontaly, if not, move the room to completedRooms
     /// </summary>
-    /// <param name="Rooms to check"></param>
     private void CheckSplitLimits(List<Room> input)
     {
         List<Room> roomsToRemove = new List<Room>();
@@ -269,6 +270,7 @@ public class MazeSpliter : MonoBehaviour
             finishedSpliting = true;
         }
     }
+    #endregion
 
     // <summary>
     // Compares room1 and room2 first on their Y position and if its the same then in their X position.
@@ -331,6 +333,4 @@ public class MazeSpliter : MonoBehaviour
     //         return 1;
     //     }
     // }
-
-    #endregion
 }
