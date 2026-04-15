@@ -11,11 +11,12 @@ public class NavigationGraph : MonoBehaviour
     public Dictionary<RectInt, List<RectInt>> adjacencyList;
     private List<RectInt> done = new();
 
+    private enum SearchType { BFS, DFS }
     [SerializeField] private SearchType searchType = SearchType.BFS;
-    private bool searching = false;
     public bool autoGenerate;
     [SerializeField] private bool generateInstantly = false;
     [SerializeField] private float NavigationDelay = 0.01f;
+    [SerializeField] private Queue<RectInt> toDo;
 
     private void Awake()
     {
@@ -34,24 +35,21 @@ public class NavigationGraph : MonoBehaviour
     [Button(enabledMode: EButtonEnableMode.Playmode)]
     public IEnumerator StartSearch()
     {
-        if (searching)
-            yield break;
-
         Reset();
         RectInt startNode = GetRandomNode();
-        searching = true;
 
         switch (searchType)
         {
             case SearchType.BFS:
-                StartCoroutine(BFS(startNode));
+                toDo = new();
+                toDo.Enqueue(startNode);
+                done.Add(startNode);
+                yield return StartCoroutine(BFS());
                 break;
             case SearchType.DFS:
-                StartCoroutine(DFS(startNode));
+                yield return StartCoroutine(DFS(startNode));
                 break;
         }
-
-        yield return new WaitWhile(() => searching);
 
         if (done.Count == adjacencyList.Keys.Count)
         {
@@ -63,68 +61,72 @@ public class NavigationGraph : MonoBehaviour
         }
     }
 
-    private IEnumerator BFS(RectInt startNode)
+    private IEnumerator BFS()
     {
-        searching = true;
-        Queue<RectInt> toDo = new();
+        if (toDo.Count == 0)
+            yield break;
 
-        toDo.Enqueue(startNode);
-        done.Add(startNode);
 
-        while (toDo.Count > 0)
+        if (!generateInstantly)
+            yield return new WaitForSeconds(NavigationDelay);
+
+        RectInt node = toDo.Dequeue();
+
+        foreach (RectInt connection in adjacencyList[node])
         {
-            RectInt node = toDo.Dequeue();
-
-            foreach (RectInt connection in adjacencyList[node])
+            if (!done.Contains(connection))
             {
-                if (!done.Contains(connection))
-                {
-                    toDo.Enqueue(connection);
-                    done.Add(connection);
-                    if (!generateInstantly)
-                    {
-                        yield return new WaitForSeconds(NavigationDelay);
-                    }
-                }
+                toDo.Enqueue(connection);
+                done.Add(connection);
             }
         }
 
-        searching = false;
+        StartCoroutine(BFS());
     }
 
-    private IEnumerator DFS(RectInt startNode)
+    private IEnumerator DFS(RectInt node)
     {
-        Stack<RectInt> toDo = new();
+        done.Add(node);
 
-        toDo.Push(startNode);
-        done.Add(startNode);
-
-        while (toDo.Count > 0)
+        foreach (RectInt connection in adjacencyList[node])
         {
-            RectInt node = toDo.Pop();
-
-            Debug.Log(node);
-
-            foreach (RectInt connection in adjacencyList[node])
+            if (!done.Contains(connection))
             {
-                if (!done.Contains(connection))
-                {
-                    toDo.Push(connection);
-                    done.Add(connection);
-                    if (!generateInstantly)
-                    {
-                        yield return new WaitForSeconds(NavigationDelay);
-                    }
-                }
+                if (!generateInstantly)
+                    yield return new WaitForSeconds(NavigationDelay);
+                yield return StartCoroutine(DFS(connection));
             }
         }
+    }
 
-        searching = false;
+    /// <summary>
+    /// 
+    /// </summary>
+    [Button(enabledMode: EButtonEnableMode.Playmode)]
+    private void RemoveRooms()
+    {
+        List<RectInt> rectIntList = new();
+        foreach (Room room in MazeSpliter.instance.completedRooms)
+        {
+            rectIntList.Add(room.rectInt);
+        }
+
+        rectIntList.Sort(CompareRoomsSize);
+
+        int targetRemoves = MazeSpliter.instance.completedRooms.Count * MazeSpliter.instance.removePercent / 100;
+
+        for (int i = 0; i < targetRemoves; i++)
+        {
+
+        }
     }
 
     [Button(enabledMode: EButtonEnableMode.Playmode)]
     public void Reset()
     {
+        if (!MazeSpliter.instance.randomizeSeed)
+            Random.InitState(MazeSpliter.instance.seed);
+
         done = new();
         adjacencyList = DoorGenerator.instance.adjacencyList;
     }
@@ -139,10 +141,27 @@ public class NavigationGraph : MonoBehaviour
         return list[Random.Range(0, list.Count)];
     }
 
-    private enum SearchType
+    /// <summary>
+    /// Compares room1 and room2 on their area,
+    /// Returns -1 if room1 is smaller, 1 if room1 is larger and 0 if their size is the same
+    /// </summary>
+    public int CompareRoomsSize(RectInt room1, RectInt room2)
     {
-        BFS,
-        DFS
+        int room1Size = room1.width * room1.height;
+        int room2Size = room2.width * room2.height;
+
+        if (room1Size == room2Size)
+        {
+            return 0;
+        }
+        else if (room1Size < room2Size)
+        {
+            return -1;
+        }
+        else
+        {
+            return 1;
+        }
     }
 }
 

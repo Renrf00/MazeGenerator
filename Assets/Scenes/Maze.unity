@@ -423,10 +423,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   randomizeSeed: 1
   seed: 0
-  maxMazeX: 100
+  maxMazeX: 1000
   maxMazeY: 100
   minRoomLength: 8
   wallThickness: 1
+  removePercent: 10
   generateInstantly: 1
   splitDelay: 0.01
   finishedSpliting: 0
@@ -474,8 +475,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   searchType: 0
-  autoGenerate: 1
-  generateInstantly: 1
+  autoGenerate: 0
+  generateInstantly: 0
   NavigationDelay: 0.01
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

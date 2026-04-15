@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using NaughtyAttributes;
 using UnityEngine;
 
+using Random = UnityEngine.Random;
+
 public class DoorGenerator : MonoBehaviour
 {
     public static DoorGenerator instance;
@@ -10,7 +12,7 @@ public class DoorGenerator : MonoBehaviour
     [SerializeField] private int doorSize = 2;
 
     private Room[] rooms;
-    private List<RectInt> doors = new();
+    private HashSet<RectInt> doors = new();
     public Dictionary<RectInt, List<RectInt>> adjacencyList = new();
 
     public bool autoGenerate = true;

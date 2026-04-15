@@ -13,11 +13,13 @@ public class MazeSpliter : MonoBehaviour
     public bool randomizeSeed = true;
     public int seed = 0;
 
-    [Header("Maze dimensions")]
+    [Header("Maze parameters")]
     public int maxMazeX = 100;
     public int maxMazeY = 100;
     [Min(0)] public int minRoomLength = 5;
     [Min(0)] public int wallThickness = 2;
+    [SerializeField, Range(0, 50)] public int removePercent = 10;
+
 
     [Header("Room generation")]
     [SerializeField] private bool generateInstantly = false;
@@ -271,66 +273,4 @@ public class MazeSpliter : MonoBehaviour
         }
     }
     #endregion
-
-    // <summary>
-    // Compares room1 and room2 first on their Y position and if its the same then in their X position.
-    // Returns -1 if room1 is closer to the origin, 1 if room1 is farther away from the origin1 and 0 if their position is the same
-    // </summary>
-    // public int CompareRoomsY(Room room1, Room room2)
-    // {
-    //     if (room1.posY == room2.posY)
-    //     {
-    //         if (room1.posX == room2.posX)
-    //         {
-    //             return 0;
-    //         }
-    //         else if (room1.posX < room2.posX)
-    //         {
-    //             return -1;
-    //         }
-    //         else
-    //         {
-    //             return 1;
-    //         }
-    //     }
-    //     else if (room1.posY < room2.posY)
-    //     {
-    //         return -1;
-    //     }
-    //     else
-    //     {
-    //         return 1;
-    //     }
-    // }
-
-    // <summary>
-    // Compares room1 and room2 first on their X position and if its the same then in their Y position.
-    // Returns -1 if room1 is closer to the origin, 1 if room1 is farther away from the origin1 and 0 if their position is the same
-    // </summary>
-    // public int CompareRoomsX(Room room1, Room room2)
-    // {
-    //     if (room1.rectInt.x == room2.rectInt.x)
-    //     {
-    //         if (room1.rectInt.y == room2.rectInt.y)
-    //         {
-    //             return 0;
-    //         }
-    //         else if (room1.rectInt.y < room2.rectInt.y)
-    //         {
-    //             return -1;
-    //         }
-    //         else
-    //         {
-    //             return 1;
-    //         }
-    //     }
-    //     else if (room1.rectInt.x < room2.rectInt.x)
-    //     {
-    //         return -1;
-    //     }
-    //     else
-    //     {
-    //         return 1;
-    //     }
-    // }
 }
