@@ -11,9 +11,9 @@ public class DoorGenerator : MonoBehaviour
     private MazeSpliter mazeSpliter;
     [SerializeField] private int doorSize = 2;
 
-    private Room[] rooms;
-    private HashSet<RectInt> doors = new();
-    public Dictionary<RectInt, List<RectInt>> adjacencyList = new();
+    private List<Room> rooms;
+    [HideInInspector] public HashSet<RectInt> doors = new();
+    [HideInInspector] public Dictionary<RectInt, List<RectInt>> adjacencyList = new();
 
     public bool autoGenerate = true;
     [SerializeField] private bool generateInstantly = false;
@@ -53,9 +53,9 @@ public class DoorGenerator : MonoBehaviour
 
         GetRooms();
 
-        for (int roomIndex = 0; roomIndex < rooms.Length; roomIndex++)
+        for (int roomIndex = 0; roomIndex < rooms.Count; roomIndex++)
         {
-            for (int compararisonIndex = roomIndex + 1; compararisonIndex < rooms.Length; compararisonIndex++)
+            for (int compararisonIndex = roomIndex + 1; compararisonIndex < rooms.Count; compararisonIndex++)
             {
                 if (AlgorithmsUtils.Intersects(rooms[roomIndex].rectInt, rooms[compararisonIndex].rectInt))
                 {
@@ -132,15 +132,7 @@ public class DoorGenerator : MonoBehaviour
     /// </summary>
     private void GetRooms()
     {
-        rooms = new Room[mazeSpliter.completedRooms.Count];
-        int index = 0;
-
-        foreach (Room room in mazeSpliter.completedRooms)
-        {
-            adjacencyList.Add(room.rectInt, new());
-            rooms[index] = room;
-            index++;
-        }
+        rooms = mazeSpliter.completedRooms;
     }
 
     private void ConnectRects(RectInt room1, RectInt room2)
