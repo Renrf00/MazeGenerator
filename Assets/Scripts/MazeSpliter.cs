@@ -1,37 +1,51 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using NaughtyAttributes;
 using UnityEngine;
-
+using UnityEngine.Events;
 using Random = UnityEngine.Random;
 
 public class MazeSpliter : MonoBehaviour
 {
-    [HideInInspector] public static MazeSpliter instance;
+    private static MazeSpliter instance;
 
+    [SerializeField] private UnityEvent onRoomGeneration;
     [Header("Random")]
-    public bool randomizeSeed = true;
-    public int seed = 0;
+    [SerializeField] private bool randomizeSeed = true;
+    [SerializeField] private int seed = 0;
 
     [Header("Maze parameters")]
-    public int maxMazeX = 100;
-    public int maxMazeY = 100;
-    [Min(0)] public int minRoomLength = 5;
-    [Min(0)] public int wallThickness = 2;
-    [SerializeField, Range(0, 50)] public int removePercent = 10;
-
+    [SerializeField] private int maxMazeX = 100;
+    [SerializeField] private int maxMazeY = 100;
+    [SerializeField, Min(0)] private int minRoomLength = 5;
+    [SerializeField, Min(0)] private int wallThickness = 2;
+    [SerializeField, Range(0, 50)] private int removePercent = 10;
 
     [Header("Room generation")]
+    [SerializeField] private bool autoGenerate;
     [SerializeField] private bool generateInstantly = false;
     [SerializeField, Min(0)] private float splitDelay = 0.2f;
-
-    private List<Room> rooms = new();
-    [HideInInspector] public List<Room> completedRooms = new();
+    private Queue<Room> rooms = new();
+    private HashSet<Room> completedRooms = new();
 
     [Header("State variables")]
     private bool splitingRooms = false;
     private bool addedWalls = false;
-    [HideInInspector] public bool finishedSpliting = false;
+
+    #region Public getters
+
+    public static MazeSpliter Instance { get { return instance; } }
+    public bool RandomizeSeed { get { return randomizeSeed; } }
+    public int Seed { get { return seed; } }
+    public int MaxMazeX { get { return maxMazeX; } }
+    public int MaxMazeY { get { return maxMazeY; } }
+    public int MinRoomLength { get { return minRoomLength; } }
+    public int WallThickness { get { return wallThickness; } }
+    public int RemovePercent { get { return removePercent; } }
+    public HashSet<Room> CompletedRooms { get { return completedRooms; } }
+
+    #endregion
 
     void Awake()
     {
@@ -39,7 +53,10 @@ public class MazeSpliter : MonoBehaviour
     }
     void Start()
     {
-        rooms.Add(new Room(0, 0, maxMazeX, maxMazeY));
+        if (autoGenerate)
+        {
+            StartCoroutine(StartSpliting());
+        }
     }
 
     void Update()
@@ -48,11 +65,13 @@ public class MazeSpliter : MonoBehaviour
         {
             AlgorithmsUtils.DebugRectInt(room.rectInt, Color.blue);
         }
-        if (!generateInstantly)
-            foreach (Room room in rooms)
-            {
-                AlgorithmsUtils.DebugRectInt(room.rectInt, Color.yellow);
-            }
+
+        if (generateInstantly) return;
+
+        foreach (Room room in rooms)
+        {
+            AlgorithmsUtils.DebugRectInt(room.rectInt, Color.yellow);
+        }
     }
 
     #region Controling generation
@@ -70,29 +89,42 @@ public class MazeSpliter : MonoBehaviour
 
         while (rooms.Count > 0)
         {
-            if (Random.Range(0, 1) == 1)
+            Room splitingRoom = rooms.Dequeue();
+
+            if (SplitLimit(splitingRoom))
             {
-                SplitHorizontal();
+                completedRooms.Add(splitingRoom);
+                continue;
+            }
+
+            if (splitingRoom.heightLimit || splitingRoom.widthLimit)
+            {
+                if (splitingRoom.widthLimit)
+                    SplitVertical(splitingRoom);
+                else
+                    SplitHorizontal(splitingRoom);
             }
             else
             {
-                SplitVertical();
+                if (Random.Range(0, 1) == 1)
+                    SplitHorizontal(splitingRoom);
+                else
+                    SplitVertical(splitingRoom);
             }
-            if (!generateInstantly)
-                yield return new WaitForSeconds(splitDelay);
+
+            if (!generateInstantly) yield return new WaitForSeconds(splitDelay);
         }
-        // completedRooms.Sort(CompareRoomsY);
+
         AddWalls();
         splitingRooms = false;
 
-        Debug.Log("Finished Spliting");
+        onRoomGeneration.Invoke();
 
-        if (DoorGenerator.instance.autoGenerate)
-            StartCoroutine(DoorGenerator.instance.GenerateDoors());
+        Debug.Log("Finished spliting");
     }
 
     /// <summary>
-    /// Will erase any existing rooms and create a room based on both maxMazeX/Y
+    /// Will erase the entire maze and create a room based on both maxMazeX/Y
     /// </summary>
     [Button(enabledMode: EButtonEnableMode.Playmode)]
     private void Reset()
@@ -101,14 +133,13 @@ public class MazeSpliter : MonoBehaviour
             Random.InitState(MazeSpliter.instance.seed);
 
         addedWalls = false;
-        finishedSpliting = false;
-        CameraUpdater.instance.UpdateCameraLocation();
-        DoorGenerator.instance.Reset();
-        NavigationGraph.instance.Reset();
+        CameraUpdater.Instance.UpdateCameraLocation();
+        DoorGenerator.Instance.Reset();
+        NavigationGraph.Instance.Reset();
 
         rooms.Clear();
         completedRooms.Clear();
-        rooms.Add(new Room(0, 0, maxMazeX, maxMazeY));
+        rooms.Enqueue(new Room(0, 0, maxMazeX, maxMazeY));
     }
 
     [Button(enabledMode: EButtonEnableMode.Playmode)]
@@ -116,95 +147,58 @@ public class MazeSpliter : MonoBehaviour
     {
         StopAllCoroutines();
         splitingRooms = false;
-
     }
     #endregion
 
     #region Spliting functions
     /// <summary>
-    /// Will try to split the room horizontaly if its not possible, it will try to do so verticaly
+    /// Will split the given room horizontaly
     /// </summary>
-    private void SplitHorizontal()
+    private void SplitHorizontal(Room splitingRoom)
     {
-        if (rooms.Count <= 0)
-        {
-            Debug.Log("No more rooms to split");
-            return;
-        }
+        int randomSplitDistance = Random.Range(minRoomLength, splitingRoom.rectInt.width - minRoomLength);
 
-        List<Room> tempRooms = new List<Room>();
-        int splitingRoom = Random.Range(0, rooms.Count);
-        int randomSplitDistance = Random.Range(minRoomLength, rooms[splitingRoom].rectInt.width - minRoomLength);
-
-        if (rooms[splitingRoom].widthLimit)
-        {
-            SplitVertical();
-            return;
-        }
-
-        tempRooms.Add(new Room(
-            rooms[splitingRoom].rectInt.x,
-            rooms[splitingRoom].rectInt.y,
+        Room room1 = new Room(
+            splitingRoom.rectInt.x,
+            splitingRoom.rectInt.y,
             randomSplitDistance,
-            rooms[splitingRoom].rectInt.height
-            ));
+            splitingRoom.rectInt.height
+            );
 
-        tempRooms.Add(new Room(
-            rooms[splitingRoom].rectInt.x + randomSplitDistance,
-            rooms[splitingRoom].rectInt.y,
-            rooms[splitingRoom].rectInt.width - randomSplitDistance,
-            rooms[splitingRoom].rectInt.height
-            ));
+        Room room2 = new Room(
+            splitingRoom.rectInt.x + randomSplitDistance,
+            splitingRoom.rectInt.y,
+            splitingRoom.rectInt.width - randomSplitDistance,
+            splitingRoom.rectInt.height
+            );
 
-        rooms.RemoveAt(splitingRoom);
-
-        rooms.Insert(splitingRoom, tempRooms[0]);
-        rooms.Insert(splitingRoom + 1, tempRooms[1]);
-
-        CheckSplitLimits(rooms);
+        rooms.Enqueue(room1);
+        rooms.Enqueue(room2);
     }
 
     /// <summary>
-    /// Will try to split the room verticaly if its not possible, it will try to do so horizontaly
+    /// Will split the given room verticaly
     /// </summary>
-    private void SplitVertical()
+    private void SplitVertical(Room splitingRoom)
     {
-        if (rooms.Count <= 0)
-        {
-            Debug.Log("No more rooms to split");
-            return;
-        }
+        int randomSplitDistance = Random.Range(minRoomLength, splitingRoom.rectInt.height - minRoomLength);
 
-        List<Room> tempRooms = new List<Room>();
-        int splitingRoom = Random.Range(0, rooms.Count);
-        int randomSplitDistance = Random.Range(minRoomLength, rooms[splitingRoom].rectInt.height - minRoomLength);
-
-        if (rooms[splitingRoom].heightLimit)
-        {
-            SplitHorizontal();
-            return;
-        }
-
-        tempRooms.Add(new Room(
-            rooms[splitingRoom].rectInt.x,
-            rooms[splitingRoom].rectInt.y,
-            rooms[splitingRoom].rectInt.width,
+        Room room1 = new Room(
+            splitingRoom.rectInt.x,
+            splitingRoom.rectInt.y,
+            splitingRoom.rectInt.width,
             randomSplitDistance
-            ));
+            );
 
-        tempRooms.Add(new Room(
-            rooms[splitingRoom].rectInt.x,
-            rooms[splitingRoom].rectInt.y + randomSplitDistance,
-            rooms[splitingRoom].rectInt.width,
-            rooms[splitingRoom].rectInt.height - randomSplitDistance
-            ));
+        Room room2 = new Room(
+            splitingRoom.rectInt.x,
+            splitingRoom.rectInt.y + randomSplitDistance,
+            splitingRoom.rectInt.width,
+            splitingRoom.rectInt.height - randomSplitDistance
+            );
 
-        rooms.RemoveAt(splitingRoom);
-
-        rooms.Insert(splitingRoom, tempRooms[0]);
-        rooms.Insert(splitingRoom + 1, tempRooms[1]);
-
-        CheckSplitLimits(rooms);
+        rooms.Enqueue(room1);
+        rooms.Enqueue(room2);
     }
     #endregion
 
@@ -238,39 +232,21 @@ public class MazeSpliter : MonoBehaviour
 
     #region Additional functions
     /// <summary>
-    /// Will check whether all input rooms can be split verticaly or horizontaly, if not, move the room to completedRooms
+    /// Checks if the given room can be split verticaly or horizontaly, changing its limit values accordingly. If it can still be split return true 
     /// </summary>
-    private void CheckSplitLimits(List<Room> input)
+    private bool SplitLimit(Room room)
     {
-        List<Room> roomsToRemove = new List<Room>();
-
-        foreach (Room room in input)
+        if (room.rectInt.width <= minRoomLength * 2)
         {
-            if (room.rectInt.width <= minRoomLength * 2)
-            {
-                room.widthLimit = true;
-            }
-
-            if (room.rectInt.height <= minRoomLength * 2)
-            {
-                room.heightLimit = true;
-            }
-
-            if (room.widthLimit && room.heightLimit)
-            {
-                completedRooms.Add(room);
-                roomsToRemove.Add(room);
-            }
-        }
-        foreach (Room room in roomsToRemove)
-        {
-            rooms.Remove(room);
+            room.widthLimit = true;
         }
 
-        if (rooms.Count == 0)
+        if (room.rectInt.height <= minRoomLength * 2)
         {
-            finishedSpliting = true;
+            room.heightLimit = true;
         }
+
+        return room.widthLimit && room.heightLimit;
     }
     #endregion
 }

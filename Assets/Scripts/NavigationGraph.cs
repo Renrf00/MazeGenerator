@@ -2,21 +2,29 @@ using System.Collections;
 using System.Collections.Generic;
 using NaughtyAttributes;
 using UnityEngine;
+using UnityEngine.Events;
 using Random = UnityEngine.Random;
 
 public class NavigationGraph : MonoBehaviour
 {
-    [HideInInspector] public static NavigationGraph instance;
+    private static NavigationGraph instance;
 
-    public Dictionary<RectInt, List<RectInt>> adjacencyList;
+    [SerializeField] private UnityEvent onSearch;
+
+    private Graph<RectInt> adjacencyList;
     private List<RectInt> done = new();
 
     private enum SearchType { BFS, DFS }
     [SerializeField] private SearchType searchType = SearchType.BFS;
-    public bool autoGenerate;
     [SerializeField] private bool generateInstantly = false;
     [SerializeField] private float NavigationDelay = 0.01f;
-    [SerializeField] private Queue<RectInt> toDo;
+    private Queue<RectInt> toDo;
+
+    #region Public getters
+
+    public static NavigationGraph Instance { get { return instance; } }
+
+    #endregion
 
     private void Awake()
     {
@@ -27,13 +35,18 @@ public class NavigationGraph : MonoBehaviour
     {
         foreach (RectInt node in done)
         {
-            foreach (RectInt connection in adjacencyList[node])
+            foreach (RectInt connection in adjacencyList.GetNeighbors(node))
                 Debug.DrawLine(new Vector3(node.x + node.width / 2, 0, node.y + node.height / 2), new Vector3(connection.x + connection.width / 2, 0, connection.y + connection.height / 2), Color.red, 0f);
         }
     }
 
     [Button(enabledMode: EButtonEnableMode.Playmode)]
-    public IEnumerator StartSearch()
+    public void StartSearch()
+    {
+        StartCoroutine(Search());
+    }
+
+    private IEnumerator Search()
     {
         Reset();
         RectInt startNode = GetRandomNode();
@@ -51,7 +64,7 @@ public class NavigationGraph : MonoBehaviour
                 break;
         }
 
-        if (done.Count == adjacencyList.Keys.Count)
+        if (done.Count == adjacencyList.GetNodeCount())
         {
             Debug.Log("The entire dungeon is connected");
         }
@@ -59,6 +72,8 @@ public class NavigationGraph : MonoBehaviour
         {
             Debug.Log("Some rooms are not connected");
         }
+
+        onSearch.Invoke();
     }
 
     private IEnumerator BFS()
@@ -66,13 +81,12 @@ public class NavigationGraph : MonoBehaviour
         if (toDo.Count == 0)
             yield break;
 
-
         if (!generateInstantly)
             yield return new WaitForSeconds(NavigationDelay);
 
         RectInt node = toDo.Dequeue();
 
-        foreach (RectInt connection in adjacencyList[node])
+        foreach (RectInt connection in adjacencyList.GetNeighbors(node))
         {
             if (!done.Contains(connection))
             {
@@ -88,7 +102,7 @@ public class NavigationGraph : MonoBehaviour
     {
         done.Add(node);
 
-        foreach (RectInt connection in adjacencyList[node])
+        foreach (RectInt connection in adjacencyList.GetNeighbors(node))
         {
             if (!done.Contains(connection))
             {
@@ -106,14 +120,14 @@ public class NavigationGraph : MonoBehaviour
     private void RemoveRooms()
     {
         List<RectInt> rectIntList = new();
-        foreach (Room room in MazeSpliter.instance.completedRooms)
+        foreach (Room room in MazeSpliter.Instance.CompletedRooms)
         {
             rectIntList.Add(room.rectInt);
         }
 
         rectIntList.Sort(CompareRoomsSize);
 
-        int targetRemoves = MazeSpliter.instance.completedRooms.Count * MazeSpliter.instance.removePercent / 100;
+        int targetRemoves = MazeSpliter.Instance.CompletedRooms.Count * MazeSpliter.Instance.RemovePercent / 100;
 
         for (int i = 0; i < targetRemoves; i++)
         {
@@ -124,17 +138,17 @@ public class NavigationGraph : MonoBehaviour
     [Button(enabledMode: EButtonEnableMode.Playmode)]
     public void Reset()
     {
-        if (!MazeSpliter.instance.randomizeSeed)
-            Random.InitState(MazeSpliter.instance.seed);
+        if (!MazeSpliter.Instance.RandomizeSeed)
+            Random.InitState(MazeSpliter.Instance.Seed);
 
         done = new();
-        adjacencyList = DoorGenerator.instance.adjacencyList;
+        adjacencyList = DoorGenerator.Instance.AdjacencyList;
     }
 
     private RectInt GetRandomNode()
     {
         List<RectInt> list = new();
-        foreach (RectInt node in adjacencyList.Keys)
+        foreach (RectInt node in adjacencyList.GetNodes())
         {
             list.Add(node);
         }

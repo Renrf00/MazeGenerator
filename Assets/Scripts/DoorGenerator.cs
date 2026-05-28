@@ -1,37 +1,40 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using NaughtyAttributes;
 using UnityEngine;
-
+using UnityEngine.Events;
 using Random = UnityEngine.Random;
 
 public class DoorGenerator : MonoBehaviour
 {
-    public static DoorGenerator instance;
-    private MazeSpliter mazeSpliter;
+    private static DoorGenerator instance;
+
+    [SerializeField] private UnityEvent onDoorGeneration;
     [SerializeField] private int doorSize = 2;
 
-    private List<Room> rooms;
-    [HideInInspector] public HashSet<RectInt> doors = new();
-    [HideInInspector] public Dictionary<RectInt, List<RectInt>> adjacencyList = new();
+    private Room[] rooms;
+    private HashSet<RectInt> doors = new();
+    private Graph<RectInt> adjacencyList = new();
+    private bool generatingDoors = false;
 
-    public bool autoGenerate = true;
     [SerializeField] private bool generateInstantly = false;
     [SerializeField, Min(0)] private float doorDelay = 0.01f;
 
-    private bool generatingDoors = false;
+    #region Public getters
 
-    void Awake()
+    public static DoorGenerator Instance { get { return instance; } }
+    public HashSet<RectInt> Doors { get { return doors; } }
+    public Graph<RectInt> AdjacencyList { get { return adjacencyList; } }
+
+    #endregion
+
+    private void Awake()
     {
         instance = this;
     }
 
-    private void Start()
-    {
-        mazeSpliter = MazeSpliter.instance;
-    }
-
-    void Update()
+    private void Update()
     {
         foreach (RectInt door in doors)
         {
@@ -39,27 +42,33 @@ public class DoorGenerator : MonoBehaviour
         }
     }
 
+    #region Door generation
     /// <summary>
-    /// Will reset the doors and start generating doors again
+    /// Will reset the doors and start generating new doors
     /// </summary>
     [Button(enabledMode: EButtonEnableMode.Playmode)]
-    public IEnumerator GenerateDoors()
+    public void RunDoorGeneration()
     {
         if (generatingDoors)
-            yield break;
+            return;
 
         Reset();
         generatingDoors = true;
 
         GetRooms();
 
-        for (int roomIndex = 0; roomIndex < rooms.Count; roomIndex++)
+        StartCoroutine(DoorGenerationCoroutine());
+    }
+
+    private IEnumerator DoorGenerationCoroutine()
+    {
+        for (int roomIndex = 0; roomIndex < rooms.Length; roomIndex++)
         {
-            for (int compararisonIndex = roomIndex + 1; compararisonIndex < rooms.Count; compararisonIndex++)
+            for (int compararisonIndex = roomIndex + 1; compararisonIndex < rooms.Length; compararisonIndex++)
             {
                 if (AlgorithmsUtils.Intersects(rooms[roomIndex].rectInt, rooms[compararisonIndex].rectInt))
                 {
-                    GenerateDoor(rooms[roomIndex], rooms[compararisonIndex]);
+                    CreateDoor(rooms[roomIndex], rooms[compararisonIndex]);
 
                     if (!generateInstantly)
                         yield return new WaitForSeconds(doorDelay);
@@ -69,8 +78,8 @@ public class DoorGenerator : MonoBehaviour
 
         generatingDoors = false;
         Debug.Log("Finished Generating Doors");
-        if (NavigationGraph.instance.autoGenerate)
-            StartCoroutine(NavigationGraph.instance.StartSearch());
+
+        onDoorGeneration.Invoke();
     }
 
     /// <summary>
@@ -79,37 +88,30 @@ public class DoorGenerator : MonoBehaviour
     [Button(enabledMode: EButtonEnableMode.Playmode)]
     public void Reset()
     {
-        if (!MazeSpliter.instance.randomizeSeed)
-            Random.InitState(MazeSpliter.instance.seed);
+        if (!MazeSpliter.Instance.RandomizeSeed)
+            Random.InitState(MazeSpliter.Instance.Seed);
 
         doors = new();
         adjacencyList = new();
     }
+    #endregion
 
-    /// <summary>
-    /// Will recieve 2 rooms and return whether a door can be generated in the intersection
-    /// </summary>
-    private bool SpaceForDoor(Room room1, Room room2)
-    {
-        RectInt intersect = AlgorithmsUtils.Intersect(room1.rectInt, room2.rectInt);
-
-        return !(((intersect.width > intersect.height ? intersect.width : intersect.height) - 2 * mazeSpliter.wallThickness) < (doorSize + 2 * mazeSpliter.wallThickness));
-    }
-
+    #region Door creation
     /// <summary>
     /// Will generate a door in the intersection between the 2 recieved rooms
     /// </summary>
-    private void GenerateDoor(Room room1, Room room2)
+    private void CreateDoor(Room room1, Room room2)
     {
         if (!SpaceForDoor(room1, room2))
             return;
+
         RectInt intersect = AlgorithmsUtils.Intersect(room1.rectInt, room2.rectInt);
         RectInt door;
 
         if (intersect.width > intersect.height)
         {
             door = new RectInt(
-                intersect.x + Random.Range(mazeSpliter.wallThickness, intersect.width - doorSize),
+                intersect.x + Random.Range(MazeSpliter.Instance.WallThickness, intersect.width - doorSize),
                 intersect.y,
                 doorSize,
                 intersect.height);
@@ -118,32 +120,32 @@ public class DoorGenerator : MonoBehaviour
         {
             door = new RectInt(
                 intersect.x,
-                intersect.y + Random.Range(mazeSpliter.wallThickness, intersect.height - doorSize),
+                intersect.y + Random.Range(MazeSpliter.Instance.WallThickness, intersect.height - doorSize),
                 intersect.width,
                 doorSize);
         }
+
         doors.Add(door);
-        ConnectRects(room1.rectInt, door);
-        ConnectRects(room2.rectInt, door);
+        adjacencyList.AddEdge(room1.rectInt, door);
+        adjacencyList.AddEdge(room2.rectInt, door);
+    }
+    #endregion
+
+    /// <summary>
+    /// Recieves 2 rooms and returns true if a door can be created in the intersection
+    /// </summary>
+    private bool SpaceForDoor(Room room1, Room room2)
+    {
+        RectInt intersect = AlgorithmsUtils.Intersect(room1.rectInt, room2.rectInt);
+
+        return !(((intersect.width > intersect.height ? intersect.width : intersect.height) - 2 * MazeSpliter.Instance.WallThickness) < (doorSize + 2 * MazeSpliter.Instance.WallThickness));
     }
 
     /// <summary>
-    /// Set rooms based on MazeSpliter completed rooms
+    /// Set "rooms" based on MazeSpliter's "completedRooms"
     /// </summary>
     private void GetRooms()
     {
-        rooms = mazeSpliter.completedRooms;
-    }
-
-    private void ConnectRects(RectInt room1, RectInt room2)
-    {
-        if (!adjacencyList.ContainsKey(room1))
-            adjacencyList.Add(room1, new());
-
-        if (!adjacencyList.ContainsKey(room2))
-            adjacencyList.Add(room2, new());
-
-        adjacencyList[room1].Add(room2);
-        adjacencyList[room2].Add(room1);
+        rooms = MazeSpliter.Instance.CompletedRooms.ToArray();
     }
 }

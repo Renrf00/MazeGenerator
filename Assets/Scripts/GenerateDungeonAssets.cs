@@ -1,16 +1,19 @@
 using System.Collections.Generic;
+using System.Linq;
 using NaughtyAttributes;
 using NUnit.Framework;
 using Unity.AI.Navigation;
 using UnityEngine;
+using UnityEngine.Events;
 
 public class GeneratePrefabs : MonoBehaviour
 {
     [HideInInspector] public static GeneratePrefabs instance;
     [SerializeField] private NavMeshSurface navMeshSurface;
+    [SerializeField] private UnityEvent OnGeneration;
 
-    private List<Room> rooms;
-    private HashSet<RectInt> doors;
+    private Room[] rooms;
+    private RectInt[] doors;
 
     [SerializeField] private GameObject wallPrefab;
     [SerializeField] private GameObject floorPrefab;
@@ -20,20 +23,17 @@ public class GeneratePrefabs : MonoBehaviour
         instance = this;
     }
 
-    private void Start()
-    {
-
-    }
-
-    private void Update()
-    {
-
-    }
-
     [Button(enabledMode: EButtonEnableMode.Playmode)]
+    public void GenerateDungeon()
+    {
+        SimpleDungeon();
+    }
+
     private void SimpleDungeon()
     {
+        Reset();
         GetRooms();
+
 
         HashSet<Vector3Int> wallPositions = new();
         HashSet<Vector3Int> floorPositions = new();
@@ -104,9 +104,17 @@ public class GeneratePrefabs : MonoBehaviour
         navMeshSurface.BuildNavMesh();
     }
 
+    public void Reset()
+    {
+        for (int n = transform.childCount - 1; n >= 0; n--)
+        {
+            Destroy(transform.GetChild(n).gameObject);
+        }
+    }
+
     private void GetRooms()
     {
-        rooms = MazeSpliter.instance.completedRooms;
-        doors = DoorGenerator.instance.doors;
+        rooms = MazeSpliter.Instance.CompletedRooms.ToArray();
+        doors = DoorGenerator.Instance.Doors.ToArray();
     }
 }
