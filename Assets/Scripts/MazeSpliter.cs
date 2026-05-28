@@ -1,7 +1,10 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using NaughtyAttributes;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Events;
 using Random = UnityEngine.Random;
@@ -11,6 +14,8 @@ public class MazeSpliter : MonoBehaviour
     private static MazeSpliter instance;
 
     [SerializeField] private UnityEvent onRoomGeneration;
+    [SerializeField] private UnityEvent onRemove;
+
     [Header("Random")]
     [SerializeField] private bool randomizeSeed = true;
     [SerializeField] private int seed = 0;
@@ -32,6 +37,7 @@ public class MazeSpliter : MonoBehaviour
     [Header("State variables")]
     private bool splitingRooms = false;
     private bool addedWalls = false;
+    private bool removing = false;
 
     #region Public getters
 
@@ -44,6 +50,7 @@ public class MazeSpliter : MonoBehaviour
     public int WallThickness { get { return wallThickness; } }
     public int RemovePercent { get { return removePercent; } }
     public HashSet<Room> CompletedRooms { get { return completedRooms; } }
+    public bool Removing { get { return removing; } }
 
     #endregion
 
@@ -135,8 +142,9 @@ public class MazeSpliter : MonoBehaviour
         addedWalls = false;
         CameraUpdater.Instance.UpdateCameraLocation();
         DoorGenerator.Instance.Reset();
-        NavigationGraph.Instance.Reset();
+        GeneratePrefabs.instance.Reset();
 
+        removing = false;
         rooms.Clear();
         completedRooms.Clear();
         rooms.Enqueue(new Room(0, 0, maxMazeX, maxMazeY));
@@ -147,6 +155,50 @@ public class MazeSpliter : MonoBehaviour
     {
         StopAllCoroutines();
         splitingRooms = false;
+    }
+
+    /// <summary>
+    /// This function will be called by the other clases to start removing a percentage of the rooms
+    /// </summary>
+    [Button(enabledMode: EButtonEnableMode.Playmode)]
+    public void StartRemove()
+    {
+        StartCoroutine(RemoveRooms());
+    }
+
+    /// <summary>
+    /// Sorts the completed rooms and starts removing the smallest one, if removing that room will make part of the dungeon inacesible then it won't remove the room and try the next smallest room, until it removes the set percentage
+    /// </summary>
+    private IEnumerator RemoveRooms()
+    {
+        removing = true;
+        int nRemoves = (int)Mathf.Floor(completedRooms.Count * removePercent / 100);
+        int startingRooms = completedRooms.Count;
+        List<Room> rooms = completedRooms.ToList();
+        rooms.Sort(CompareRoomArea);
+        int index = 0;
+
+        while (rooms.Count > startingRooms - nRemoves)
+        {
+            completedRooms.Remove(rooms[index]);
+            DoorGenerator.Instance.RunDoorGeneration();
+
+            yield return new WaitUntil(() => NavigationGraph.Instance.Searched == true);
+
+            if (NavigationGraph.Instance.Connected)
+            {
+                rooms.RemoveAt(index);
+            }
+            else
+            {
+                completedRooms.Add(rooms[index]);
+                index++;
+            }
+        }
+
+        Debug.Log("Finished removing");
+
+        onRemove.Invoke();
     }
     #endregion
 
@@ -247,6 +299,19 @@ public class MazeSpliter : MonoBehaviour
         }
 
         return room.widthLimit && room.heightLimit;
+    }
+
+    private int CompareRoomArea(Room room1, Room room2)
+    {
+        int room1Area = room1.rectInt.height * room1.rectInt.width;
+        int room2Area = room2.rectInt.height * room2.rectInt.width;
+
+        if (room1Area < room2Area)
+            return -1;
+        else if (room1Area > room2Area)
+            return 1;
+        else
+            return 0;
     }
     #endregion
 }

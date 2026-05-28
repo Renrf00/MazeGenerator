@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using NaughtyAttributes;
@@ -19,10 +20,14 @@ public class NavigationGraph : MonoBehaviour
     [SerializeField] private bool generateInstantly = false;
     [SerializeField] private float NavigationDelay = 0.01f;
     private Queue<RectInt> toDo;
+    private bool searched = false;
+    private bool connected = false;
 
     #region Public getters
 
     public static NavigationGraph Instance { get { return instance; } }
+    public bool Searched { get { return searched; } }
+    public bool Connected { get { return connected; } }
 
     #endregion
 
@@ -67,13 +72,18 @@ public class NavigationGraph : MonoBehaviour
         if (done.Count == adjacencyList.GetNodeCount())
         {
             Debug.Log("The entire dungeon is connected");
+            connected = true;
         }
         else
         {
             Debug.Log("Some rooms are not connected");
+            connected = false;
         }
 
-        onSearch.Invoke();
+        searched = true;
+
+        if (!MazeSpliter.Instance.Removing)
+            onSearch.Invoke();
     }
 
     private IEnumerator BFS()
@@ -113,28 +123,6 @@ public class NavigationGraph : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 
-    /// </summary>
-    [Button(enabledMode: EButtonEnableMode.Playmode)]
-    private void RemoveRooms()
-    {
-        List<RectInt> rectIntList = new();
-        foreach (Room room in MazeSpliter.Instance.CompletedRooms)
-        {
-            rectIntList.Add(room.rectInt);
-        }
-
-        rectIntList.Sort(CompareRoomsSize);
-
-        int targetRemoves = MazeSpliter.Instance.CompletedRooms.Count * MazeSpliter.Instance.RemovePercent / 100;
-
-        for (int i = 0; i < targetRemoves; i++)
-        {
-
-        }
-    }
-
     [Button(enabledMode: EButtonEnableMode.Playmode)]
     public void Reset()
     {
@@ -143,6 +131,8 @@ public class NavigationGraph : MonoBehaviour
 
         done = new();
         adjacencyList = DoorGenerator.Instance.AdjacencyList;
+        searched = false;
+        connected = false;
     }
 
     private RectInt GetRandomNode()
@@ -153,29 +143,6 @@ public class NavigationGraph : MonoBehaviour
             list.Add(node);
         }
         return list[Random.Range(0, list.Count)];
-    }
-
-    /// <summary>
-    /// Compares room1 and room2 on their area,
-    /// Returns -1 if room1 is smaller, 1 if room1 is larger and 0 if their size is the same
-    /// </summary>
-    public int CompareRoomsSize(RectInt room1, RectInt room2)
-    {
-        int room1Size = room1.width * room1.height;
-        int room2Size = room2.width * room2.height;
-
-        if (room1Size == room2Size)
-        {
-            return 0;
-        }
-        else if (room1Size < room2Size)
-        {
-            return -1;
-        }
-        else
-        {
-            return 1;
-        }
     }
 }
 

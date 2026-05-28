@@ -455,15 +455,30 @@ MonoBehaviour:
           m_IntArgument: 0
           m_FloatArgument: 0
           m_StringArgument: 
+          m_BoolArgument: 1
+        m_CallState: 2
+  onRemove:
+    m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 521360286}
+        m_TargetAssemblyTypeName: GeneratePrefabs, Assembly-CSharp
+        m_MethodName: GenerateDungeon
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
   randomizeSeed: 1
   seed: 0
   maxMazeX: 50
   maxMazeY: 50
-  minRoomLength: 8
+  minRoomLength: 5
   wallThickness: 1
-  removePercent: 10
+  removePercent: 30
   autoGenerate: 1
   generateInstantly: 1
   splitDelay: 0.01
@@ -527,9 +542,9 @@ MonoBehaviour:
   onSearch:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 521360286}
-        m_TargetAssemblyTypeName: GeneratePrefabs, Assembly-CSharp
-        m_MethodName: GenerateDungeon
+      - m_Target: {fileID: 521360282}
+        m_TargetAssemblyTypeName: MazeSpliter, Assembly-CSharp
+        m_MethodName: StartRemove
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}

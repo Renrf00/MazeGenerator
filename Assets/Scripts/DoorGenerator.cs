@@ -1,7 +1,9 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using NaughtyAttributes;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Events;
 using Random = UnityEngine.Random;
@@ -55,8 +57,6 @@ public class DoorGenerator : MonoBehaviour
         Reset();
         generatingDoors = true;
 
-        GetRooms();
-
         StartCoroutine(DoorGenerationCoroutine());
     }
 
@@ -91,8 +91,14 @@ public class DoorGenerator : MonoBehaviour
         if (!MazeSpliter.Instance.RandomizeSeed)
             Random.InitState(MazeSpliter.Instance.Seed);
 
+        rooms = MazeSpliter.Instance.CompletedRooms.ToArray();
         doors = new();
         adjacencyList = new();
+        foreach (Room room in rooms)
+        {
+            adjacencyList.AddNode(room.rectInt);
+        }
+        NavigationGraph.Instance.Reset();
     }
     #endregion
 
@@ -139,13 +145,5 @@ public class DoorGenerator : MonoBehaviour
         RectInt intersect = AlgorithmsUtils.Intersect(room1.rectInt, room2.rectInt);
 
         return !(((intersect.width > intersect.height ? intersect.width : intersect.height) - 2 * MazeSpliter.Instance.WallThickness) < (doorSize + 2 * MazeSpliter.Instance.WallThickness));
-    }
-
-    /// <summary>
-    /// Set "rooms" based on MazeSpliter's "completedRooms"
-    /// </summary>
-    private void GetRooms()
-    {
-        rooms = MazeSpliter.Instance.CompletedRooms.ToArray();
     }
 }

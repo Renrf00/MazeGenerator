@@ -106,10 +106,11 @@ public class GeneratePrefabs : MonoBehaviour
 
     public void Reset()
     {
-        for (int n = transform.childCount - 1; n >= 0; n--)
+        foreach (Transform child in transform)
         {
-            Destroy(transform.GetChild(n).gameObject);
+            Destroy(child.gameObject);
         }
+        navMeshSurface.RemoveData();
     }
 
     private void GetRooms()
