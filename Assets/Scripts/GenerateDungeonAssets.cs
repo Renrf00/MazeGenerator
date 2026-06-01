@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NaughtyAttributes;
@@ -5,6 +6,7 @@ using NUnit.Framework;
 using Unity.AI.Navigation;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.Tilemaps;
 
 public class GeneratePrefabs : MonoBehaviour
 {
@@ -15,8 +17,9 @@ public class GeneratePrefabs : MonoBehaviour
     private Room[] rooms;
     private RectInt[] doors;
 
-    [SerializeField] private GameObject wallPrefab;
+    [SerializeField] private GameObject[] wallPrefabs;
     [SerializeField] private GameObject floorPrefab;
+    private int[,] tilemap;
 
     private void Awake()
     {
@@ -33,75 +36,74 @@ public class GeneratePrefabs : MonoBehaviour
     {
         Reset();
         GetRooms();
+        GenerateTilemap();
 
 
-        HashSet<Vector3Int> wallPositions = new();
-        HashSet<Vector3Int> floorPositions = new();
 
-        // Walls
+        // Generation
 
+        // foreach (Vector3Int wall in wallPositions)
+        // {
+        //     Instantiate(wallPrefab, wall, wallPrefab.transform.rotation, transform);
+        // }
+
+        // foreach (Vector3Int floor in floorPositions)
+        // {
+        //     Instantiate(floorPrefab, floor, wallPrefab.transform.rotation, transform);
+        // }
+
+        navMeshSurface.BuildNavMesh();
+    }
+
+    [Button(enabledMode: EButtonEnableMode.Playmode)]
+    private void GenerateTilemap()
+    {
+        tilemap = new int[MazeSpliter.Instance.MaxMazeY + 1, MazeSpliter.Instance.MaxMazeX + 1];
+
+        // wall
         foreach (var room in rooms)
         {
-            for (int i = 1; i <= 4; i++)
+            for (int side = 1; side <= 4; side++)
             {
-                for (int j = 0; j < (i < 3 ? room.rectInt.height : room.rectInt.width - 1); j++)
+                for (int length = 0; length < (side < 3 ? room.rectInt.height : room.rectInt.width - 1); length++)
                 {
-                    wallPositions.Add(new Vector3Int(
-                        i > 2 ? room.rectInt.position.x + 1 * j : (i == 1 ? room.rectInt.position.x : room.rectInt.position.x + room.rectInt.width - 1),
-                        0,
-                        i < 3 ? room.rectInt.position.y + 1 * j : (i == 3 ? room.rectInt.position.y : room.rectInt.position.y + room.rectInt.height - 1))
-                    );
+                    tilemap[
+                        side < 3 ? room.rectInt.position.y + 1 * length : (side == 3 ? room.rectInt.position.y : room.rectInt.position.y + room.rectInt.height - 1),
+                        side > 2 ? room.rectInt.position.x + 1 * length : (side == 1 ? room.rectInt.position.x : room.rectInt.position.x + room.rectInt.width - 1)] = 1;
                 }
             }
         }
 
-        // Floors
-
-        foreach (var room in rooms)
-        {
-            for (int x = 1; x < room.rectInt.width - 1; x++)
-            {
-                for (int y = 1; y < room.rectInt.height - 1; y++)
-                {
-                    floorPositions.Add(new Vector3Int(
-                        room.rectInt.position.x + x,
-                        0,
-                        room.rectInt.position.y + y
-                    ));
-                }
-            }
-        }
-
-        // Doors
-
+        // doors
         foreach (RectInt door in doors)
         {
             for (int x = 0; x < door.width; x++)
             {
-                wallPositions.Remove(new Vector3Int(door.position.x + x, 0, door.position.y));
-                floorPositions.Add(new Vector3Int(door.position.x + x, 0, door.position.y));
+                tilemap[door.position.y, door.position.x + x] = 0;
             }
 
             for (int y = 1; y < door.height; y++)
             {
-                wallPositions.Remove(new Vector3Int(door.position.x, 0, door.position.y + y));
-                floorPositions.Add(new Vector3Int(door.position.x, 0, door.position.y + y));
+                tilemap[door.position.y + y, door.position.x] = 0;
             }
         }
 
-        // Generation
+        // PrintTilemap();
+    }
 
-        foreach (Vector3Int wall in wallPositions)
+    private void PrintTilemap()
+    {
+        string tiles = "";
+        for (int y = 0; y < MazeSpliter.Instance.MaxMazeY + 1; y++)
         {
-            Instantiate(wallPrefab, wall, wallPrefab.transform.rotation, transform);
+            for (int x = 0; x < MazeSpliter.Instance.MaxMazeX + 1; x++)
+            {
+                tiles += tilemap[MazeSpliter.Instance.MaxMazeY - y, x] == 0 ? "0" : "8";
+            }
+            tiles += "\n";
         }
 
-        foreach (Vector3Int floor in floorPositions)
-        {
-            Instantiate(floorPrefab, floor, wallPrefab.transform.rotation, transform);
-        }
-
-        navMeshSurface.BuildNavMesh();
+        Debug.Log(tiles);
     }
 
     public void Reset()

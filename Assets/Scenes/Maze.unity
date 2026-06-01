@@ -472,13 +472,13 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-  randomizeSeed: 1
+  randomizeSeed: 0
   seed: 0
-  maxMazeX: 50
-  maxMazeY: 50
+  maxMazeX: 16
+  maxMazeY: 11
   minRoomLength: 5
   wallThickness: 1
-  removePercent: 30
+  removePercent: 0
   autoGenerate: 1
   generateInstantly: 1
   splitDelay: 0.01
@@ -573,7 +573,7 @@ MonoBehaviour:
   OnGeneration:
     m_PersistentCalls:
       m_Calls: []
-  wallPrefab: {fileID: 6075203173641062802, guid: 1d0137fb06bfb4e08bbd6575a331e735, type: 3}
+  wallPrefabs: []
   floorPrefab: {fileID: 706103477641137094, guid: e53c107180363432baa17604c2be1abb, type: 3}
 --- !u!1 &771093274
 GameObject:
