@@ -472,13 +472,13 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-  randomizeSeed: 0
+  randomizeSeed: 1
   seed: 0
-  maxMazeX: 16
-  maxMazeY: 11
+  maxMazeX: 50
+  maxMazeY: 50
   minRoomLength: 5
   wallThickness: 1
-  removePercent: 0
+  removePercent: 34
   autoGenerate: 1
   generateInstantly: 1
   splitDelay: 0.01
@@ -573,8 +573,24 @@ MonoBehaviour:
   OnGeneration:
     m_PersistentCalls:
       m_Calls: []
-  wallPrefabs: []
-  floorPrefab: {fileID: 706103477641137094, guid: e53c107180363432baa17604c2be1abb, type: 3}
+  generateInstantly: 1
+  generationDelay: 0.01
+  wallPrefabs:
+  - {fileID: 3536731398422851134, guid: 1baa95304ce7d1c459443df8de1457e8, type: 3}
+  - {fileID: 5030216813126683104, guid: e33a7699cbf2ac441b511ab59f6078d8, type: 3}
+  - {fileID: 7514916297929841920, guid: 931432e0665eb58469d2485b15077dc0, type: 3}
+  - {fileID: 1929578581665396683, guid: cf01063069e735648ab8a1c748d2da83, type: 3}
+  - {fileID: 6304062369785680671, guid: e3bc682dfc7e04bc4ab35a8d52354132, type: 3}
+  - {fileID: 6836559720073715965, guid: c6f83813070bea041a9a0e107ab51f59, type: 3}
+  - {fileID: 6898582374593550339, guid: ae8cbe638b9f7074dbc7244fb3c26600, type: 3}
+  - {fileID: 5967930082345930632, guid: a9b3b91ceb6f1134ca74cce01b6a78a8, type: 3}
+  - {fileID: 4826982777467161412, guid: bab40014c6bafe441b1a47834f863221, type: 3}
+  - {fileID: 7858751825456988605, guid: 3dca0d82216bc44a69f3f35434371740, type: 3}
+  - {fileID: 5853187014843131501, guid: 272fb9cc01e08f247b43f7e6c38dfdfb, type: 3}
+  - {fileID: 4102568016840167935, guid: 2845a60bcd2f5514e93bad2c324f8d31, type: 3}
+  - {fileID: 1040310750116940119, guid: 988bdb5b8c8e5684f82e8aa72c31960a, type: 3}
+  - {fileID: 2891759284571720867, guid: ef501ae38d35df8469fa26679054f194, type: 3}
+  floorPrefab: {fileID: 3204687337251383887, guid: ee2ec93b0f8db314d99c5c4ca581bc18, type: 3}
 --- !u!1 &771093274
 GameObject:
   m_ObjectHideFlags: 0

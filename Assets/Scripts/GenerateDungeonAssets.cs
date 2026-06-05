@@ -1,66 +1,135 @@
-using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using NaughtyAttributes;
-using NUnit.Framework;
 using Unity.AI.Navigation;
 using UnityEngine;
 using UnityEngine.Events;
-using UnityEngine.Tilemaps;
 
 public class GeneratePrefabs : MonoBehaviour
 {
-    [HideInInspector] public static GeneratePrefabs instance;
+    private static GeneratePrefabs instance;
+
     [SerializeField] private NavMeshSurface navMeshSurface;
     [SerializeField] private UnityEvent OnGeneration;
+    [SerializeField] private bool generateInstantly;
+    [SerializeField] private float generationDelay = 0.01f;
+    [SerializeField] private GameObject[] wallPrefabs;
+    [SerializeField] private GameObject floorPrefab;
 
     private Room[] rooms;
     private RectInt[] doors;
 
-    [SerializeField] private GameObject[] wallPrefabs;
-    [SerializeField] private GameObject floorPrefab;
+    private Graph<Vector2Int> adjacencyList;
+    private List<Vector2Int> done;
+
     private int[,] tilemap;
+
+    private bool generatingDungeon = false;
+    private int currentX = 0;
+    private int currentY = 0;
+
+    #region Public Getters
+
+    public static GeneratePrefabs Instance { get { return instance; } }
+
+    #endregion
 
     private void Awake()
     {
         instance = this;
     }
 
+    private void Update()
+    {
+        if (!generatingDungeon || generateInstantly) return;
+        AlgorithmsUtils.DebugRectInt(new RectInt(new Vector2Int(currentX, currentY), new Vector2Int(2, 2)), Color.yellow);
+    }
+    #region Dungeon generation
+    /// <summary>
+    /// Starts wall generation process
+    /// </summary>
     [Button(enabledMode: EButtonEnableMode.Playmode)]
     public void GenerateDungeon()
     {
-        SimpleDungeon();
+        StartCoroutine(SimpleDungeon());
     }
 
-    private void SimpleDungeon()
+    /// <summary>
+    /// Generates walls and starts floor generation
+    /// </summary>
+    private IEnumerator SimpleDungeon()
     {
         Reset();
         GetRooms();
         GenerateTilemap();
+        generatingDungeon = true;
 
+        // Walls
+        for (int y = 0; y < MazeSpliter.Instance.MaxMazeY; y++)
+        {
+            for (int x = 0; x < MazeSpliter.Instance.MaxMazeX; x++)
+            {
+                currentX = x;
+                currentY = y;
 
+                int nPrefab = tilemap[y, x] + tilemap[y + 1, x] * 2 + tilemap[y + 1, x + 1] * 4 + tilemap[y, x + 1] * 8;
 
-        // Generation
+                if (nPrefab == 0) continue;
 
-        // foreach (Vector3Int wall in wallPositions)
-        // {
-        //     Instantiate(wallPrefab, wall, wallPrefab.transform.rotation, transform);
-        // }
+                Instantiate(wallPrefabs[nPrefab - 1], new Vector3(x + 1, 0, y + 1), wallPrefabs[nPrefab - 1].transform.rotation, transform);
+                if (!generateInstantly) yield return new WaitForSeconds(generationDelay);
+            }
+        }
 
-        // foreach (Vector3Int floor in floorPositions)
-        // {
-        //     Instantiate(floorPrefab, floor, wallPrefab.transform.rotation, transform);
-        // }
+        // Floor
+        yield return StartCoroutine(FloorFill(GetRandomEmptyTile()));
 
         navMeshSurface.BuildNavMesh();
+
+        Debug.Log("Finished generation");
+        generatingDungeon = false;
     }
 
+    /// <summary>
+    /// Generates floor
+    /// </summary>
+    private IEnumerator FloorFill(Vector2Int tile)
+    {
+        done.Add(tile);
+        Instantiate(floorPrefab, new Vector3(tile.x + 0.5f, 0, tile.y + 0.5f), floorPrefab.transform.rotation, transform);
+
+        foreach (Vector2Int connection in adjacencyList.GetNeighbors(tile))
+        {
+            if (!done.Contains(connection) && tilemap[connection.y, connection.x] == 0)
+            {
+                if (!generateInstantly) yield return new WaitForSeconds(generationDelay);
+                yield return StartCoroutine(FloorFill(connection));
+            }
+        }
+    }
+
+    public void Reset()
+    {
+        foreach (Transform child in transform)
+        {
+            Destroy(child.gameObject);
+        }
+        adjacencyList = new();
+        done = new();
+
+        navMeshSurface.RemoveData();
+        generatingDungeon = false;
+    }
+    #endregion
+
+    #region Other functions
     [Button(enabledMode: EButtonEnableMode.Playmode)]
     private void GenerateTilemap()
     {
         tilemap = new int[MazeSpliter.Instance.MaxMazeY + 1, MazeSpliter.Instance.MaxMazeX + 1];
 
-        // wall
+        // Wall
         foreach (var room in rooms)
         {
             for (int side = 1; side <= 4; side++)
@@ -74,7 +143,7 @@ public class GeneratePrefabs : MonoBehaviour
             }
         }
 
-        // doors
+        // Doors
         foreach (RectInt door in doors)
         {
             for (int x = 0; x < door.width; x++)
@@ -88,31 +157,8 @@ public class GeneratePrefabs : MonoBehaviour
             }
         }
 
+        GenerateAdjacentcyList();
         // PrintTilemap();
-    }
-
-    private void PrintTilemap()
-    {
-        string tiles = "";
-        for (int y = 0; y < MazeSpliter.Instance.MaxMazeY + 1; y++)
-        {
-            for (int x = 0; x < MazeSpliter.Instance.MaxMazeX + 1; x++)
-            {
-                tiles += tilemap[MazeSpliter.Instance.MaxMazeY - y, x] == 0 ? "0" : "8";
-            }
-            tiles += "\n";
-        }
-
-        Debug.Log(tiles);
-    }
-
-    public void Reset()
-    {
-        foreach (Transform child in transform)
-        {
-            Destroy(child.gameObject);
-        }
-        navMeshSurface.RemoveData();
     }
 
     private void GetRooms()
@@ -120,4 +166,33 @@ public class GeneratePrefabs : MonoBehaviour
         rooms = MazeSpliter.Instance.CompletedRooms.ToArray();
         doors = DoorGenerator.Instance.Doors.ToArray();
     }
+
+    private void GenerateAdjacentcyList()
+    {
+        for (int x = 0; x < MazeSpliter.Instance.MaxMazeX; x++)
+        {
+            for (int y = 0; y < MazeSpliter.Instance.MaxMazeX; y++)
+            {
+                if (x >= 1)
+                    adjacencyList.AddEdge(new Vector2Int(x, y), new Vector2Int(x - 1, y));
+                if (y >= 1)
+                    adjacencyList.AddEdge(new Vector2Int(x, y), new Vector2Int(x, y - 1));
+                if (x <= MazeSpliter.Instance.MaxMazeX - 1)
+                    adjacencyList.AddEdge(new Vector2Int(x, y), new Vector2Int(x + 1, y));
+                if (y <= MazeSpliter.Instance.MaxMazeY - 1)
+                    adjacencyList.AddEdge(new Vector2Int(x, y), new Vector2Int(x, y + 1));
+            }
+        }
+    }
+
+    private Vector2Int GetRandomEmptyTile()
+    {
+        List<Vector2Int> list = new();
+        foreach (Room room in rooms)
+        {
+            list.Add(room.rectInt.position += new Vector2Int(1, 1));
+        }
+        return list[Random.Range(0, list.Count)];
+    }
+    #endregion
 }

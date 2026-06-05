@@ -142,7 +142,7 @@ public class MazeSpliter : MonoBehaviour
         addedWalls = false;
         CameraUpdater.Instance.UpdateCameraLocation();
         DoorGenerator.Instance.Reset();
-        GeneratePrefabs.instance.Reset();
+        GeneratePrefabs.Instance.Reset();
 
         removing = false;
         rooms.Clear();

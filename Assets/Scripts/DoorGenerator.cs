@@ -60,6 +60,9 @@ public class DoorGenerator : MonoBehaviour
         StartCoroutine(DoorGenerationCoroutine());
     }
 
+    /// <summary>
+    /// Handles the actual door generation
+    /// </summary>
     private IEnumerator DoorGenerationCoroutine()
     {
         for (int roomIndex = 0; roomIndex < rooms.Length; roomIndex++)

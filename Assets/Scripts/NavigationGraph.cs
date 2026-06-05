@@ -51,6 +51,9 @@ public class NavigationGraph : MonoBehaviour
         StartCoroutine(Search());
     }
 
+    /// <summary>
+    /// Checks if the entire dungeon is connected by DFS or BFS (based on "searchType")
+    /// </summary>
     private IEnumerator Search()
     {
         Reset();
